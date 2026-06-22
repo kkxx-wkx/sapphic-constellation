@@ -284,7 +284,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     invitee_email: inviteeEmail || null,
     proposed_alias: proposedAlias,
     proposed_relationship_type: relationshipType,
-    share_channel: 'link',
   })
   .select()
   .single();
