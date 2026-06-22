@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { User, Session, PostgrestError } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import {
   DisplayMode,
@@ -205,21 +205,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Also create or update the user's own node in the people table
     // This makes "me" appear as the center node in the graph.
-    const { error: selfPersonError } = await supabase
+    const selfNodePayload = {
+      owner_id: state.user.id,
+      profile_id: state.user.id,
+      alias,
+      real_name: realName || null,
+      display_mode: displayMode,
+      consent_status: 'approved' as ConsentStatus,
+    };
+
+    const { data: existingSelfNode } = await supabase
       .from('people')
-      .upsert(
-        {
-          owner_id: state.user.id,
-          profile_id: state.user.id,
-          alias,
-          real_name: realName || null,
-          display_mode: displayMode,
-          consent_status: 'approved',
-        },
-        {
-          onConflict: 'owner_id,profile_id',
-        }
-      );
+      .select('id')
+      .eq('owner_id', state.user.id)
+      .eq('profile_id', state.user.id)
+      .maybeSingle();
+
+    let selfPersonError: PostgrestError | null = null;
+    if (existingSelfNode?.id) {
+      ({ error: selfPersonError } = await supabase
+        .from('people')
+        .update(selfNodePayload)
+        .eq('id', existingSelfNode.id));
+    } else {
+      ({ error: selfPersonError } = await supabase
+        .from('people')
+        .insert(selfNodePayload));
+    }
 
     if (selfPersonError) {
       return { error: selfPersonError };
@@ -245,24 +257,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Keep the user's self-node in people in sync with profile changes.
-      const selfPersonUpdates: Record<string, unknown> = {};
-      if (updates.alias !== undefined) selfPersonUpdates.alias = updates.alias;
-      if (updates.real_name !== undefined) selfPersonUpdates.real_name = updates.real_name;
-      if (updates.display_mode !== undefined) selfPersonUpdates.display_mode = updates.display_mode;
-      if (updates.consent_status !== undefined) selfPersonUpdates.consent_status = updates.consent_status;
+      const selfPersonUpdates: Record<string, unknown> = {
+        owner_id: state.user.id,
+        profile_id: state.user.id,
+        alias: updates.alias,
+        real_name: updates.real_name ?? null,
+        display_mode: updates.display_mode,
+        consent_status: 'approved',
+      };
 
-      if (Object.keys(selfPersonUpdates).length > 0) {
-        await supabase
-          .from('people')
-          .upsert(
-            {
-              owner_id: state.user.id,
-              profile_id: state.user.id,
-              ...selfPersonUpdates,
-            },
-            { onConflict: 'owner_id,profile_id' }
-          )
-          .eq('profile_id', state.user.id);
+      const { data: existingSelfNode } = await supabase
+        .from('people')
+        .select('id')
+        .eq('owner_id', state.user.id)
+        .eq('profile_id', state.user.id)
+        .maybeSingle();
+
+      if (existingSelfNode?.id) {
+        await supabase.from('people').update(selfPersonUpdates).eq('id', existingSelfNode.id);
+      } else {
+        await supabase.from('people').insert(selfPersonUpdates);
       }
 
       await refreshData();
