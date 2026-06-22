@@ -33,20 +33,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { state } = useApp();
-
-if (state.loading) {
-  return null;
-}
-
-  if (isLoading) {
-    return null;
-  }
-
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/auth" element={<AuthPage />} />
+
       <Route
         path="/profile"
         element={
@@ -55,6 +46,7 @@ if (state.loading) {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/graph"
         element={
@@ -63,6 +55,7 @@ if (state.loading) {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/invite"
         element={
@@ -71,6 +64,7 @@ if (state.loading) {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/consent"
         element={
@@ -79,10 +73,12 @@ if (state.loading) {
           </ProtectedRoute>
         }
       />
+
       <Route
         path="/consent/:token"
         element={<ConsentAcceptPage />}
       />
+
       <Route
         path="/settings"
         element={
@@ -91,19 +87,8 @@ if (state.loading) {
           </ProtectedRoute>
         }
       />
+
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
-
-function App() {
-  return (
-    <AppProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AppProvider>
-  );
-}
-
-export default App;
