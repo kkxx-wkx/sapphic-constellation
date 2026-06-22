@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Star, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -7,6 +7,7 @@ type AuthMode = 'signin' | 'signup';
 
 export default function AuthPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [mode, setMode] = useState<AuthMode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,21 +21,23 @@ export default function AuthPage() {
     setError(null);
 
     try {
+      const redirect = searchParams.get('redirect');
+      const safeRedirect = redirect?.startsWith('/consent/') ? redirect : null;
+
       if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({
           email,
           password,
         });
         if (error) throw error;
-        // After signup, user is automatically signed in (email confirmation is off)
-        navigate('/profile');
+        navigate(safeRedirect || '/profile');
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        navigate('/graph');
+        navigate(safeRedirect || '/graph');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');

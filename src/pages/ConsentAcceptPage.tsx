@@ -77,7 +77,7 @@ export default function ConsentAcceptPage() {
           <p className="text-white/60 mb-6">
             You need to sign in to accept this invitation.
           </p>
-          <Link to="/auth" className="btn-primary inline-flex items-center gap-2">
+          <Link to={`/auth?redirect=${encodeURIComponent(`/consent/${token}`)}`} className="btn-primary inline-flex items-center gap-2">
             Sign In
           </Link>
         </div>
