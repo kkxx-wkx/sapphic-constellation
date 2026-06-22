@@ -35,9 +35,9 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   const { state } = useApp();
 
-if (state.loading) {
-  return null;
-}
+  if (state.loading) {
+    return null;
+  }
 
   if (isLoading) {
     return null;
