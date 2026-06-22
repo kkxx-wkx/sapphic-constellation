@@ -240,11 +240,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const { error } = await supabase.from('profiles').update(updates).eq('id', state.user.id);
 
-      if (!error) {
-        await refreshData();
+      if (error) {
+        return { error };
       }
 
-      return { error };
+      // Keep the user's self-node in people in sync with profile changes.
+      const selfPersonUpdates: Record<string, unknown> = {};
+      if (updates.alias !== undefined) selfPersonUpdates.alias = updates.alias;
+      if (updates.real_name !== undefined) selfPersonUpdates.real_name = updates.real_name;
+      if (updates.display_mode !== undefined) selfPersonUpdates.display_mode = updates.display_mode;
+      if (updates.consent_status !== undefined) selfPersonUpdates.consent_status = updates.consent_status;
+
+      if (Object.keys(selfPersonUpdates).length > 0) {
+        await supabase
+          .from('people')
+          .upsert(
+            {
+              owner_id: state.user.id,
+              profile_id: state.user.id,
+              ...selfPersonUpdates,
+            },
+            { onConflict: 'owner_id,profile_id' }
+          )
+          .eq('profile_id', state.user.id);
+      }
+
+      await refreshData();
+      return { error: null };
     },
     [state.user, refreshData]
   );
