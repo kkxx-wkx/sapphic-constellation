@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Star,
   Shield,
@@ -16,8 +16,35 @@ import {
 import { useApp } from '../context/AppContext';
 import { getRelationshipLabel, RelationshipType } from '../types';
 
+const PENDING_CONSENT_KEY = 'pendingConsent';
+
+interface PendingConsent {
+  token: string;
+  choice: 'anonymous' | 'with_name' | 'hide_connection' | 'reject';
+  realName: string;
+}
+
+function savePendingConsent(data: PendingConsent) {
+  sessionStorage.setItem(PENDING_CONSENT_KEY, JSON.stringify(data));
+}
+
+function loadPendingConsent(): PendingConsent | null {
+  const raw = sessionStorage.getItem(PENDING_CONSENT_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as PendingConsent;
+  } catch {
+    return null;
+  }
+}
+
+function clearPendingConsent() {
+  sessionStorage.removeItem(PENDING_CONSENT_KEY);
+}
+
 export default function ConsentAcceptPage() {
   const { token } = useParams<{ token: string }>();
+  const navigate = useNavigate();
   const { getInvitationByToken, state, acceptInvitation } = useApp();
   const [choice, setChoice] = useState<'anonymous' | 'with_name' | 'hide_connection' | 'reject' | null>(null);
   const [realName, setRealName] = useState('');
@@ -31,21 +58,45 @@ export default function ConsentAcceptPage() {
     createdAt: string;
   } | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [restoredPending, setRestoredPending] = useState(false);
 
   useEffect(() => {
-  async function loadInvitation() {
-    if (token) {
-      const inv = await getInvitationByToken(token);
-      if (inv) {
-        setInvitation(inv);
-      } else {
-        setNotFound(true);
+    async function loadInvitation() {
+      if (token) {
+        const inv = await getInvitationByToken(token);
+        if (inv) {
+          setInvitation(inv);
+        } else {
+          setNotFound(true);
+        }
       }
     }
-  }
 
-  loadInvitation();
-}, [token, getInvitationByToken]);
+    loadInvitation();
+  }, [token, getInvitationByToken]);
+
+  useEffect(() => {
+    const pending = loadPendingConsent();
+    if (pending && pending.token === token) {
+      setChoice(pending.choice);
+      setRealName(pending.realName);
+      setRestoredPending(true);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (!restoredPending || !state.user || !invitation || !token || !choice) return;
+    if (invitation.status !== 'pending') return;
+
+    setRestoredPending(false);
+    setLoading(true);
+
+    acceptInvitation(token, choice, realName.trim() || undefined).then((res) => {
+      setResult(res);
+      setLoading(false);
+      clearPendingConsent();
+    });
+  }, [restoredPending, state.user, invitation, token, choice, realName, acceptInvitation]);
 
   if (notFound) {
     return (
@@ -60,25 +111,6 @@ export default function ConsentAcceptPage() {
           </p>
           <Link to="/" className="btn-primary inline-flex items-center gap-2">
             Go Home
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  if (!state.user) {
-    return (
-      <div className="min-h-screen relative flex items-center justify-center">
-        <div className="stars-bg" />
-        <div className="stars-pattern" />
-        <div className="relative z-10 glass-panel p-12 rounded-3xl max-w-md text-center">
-          <Shield className="w-12 h-12 text-blue-300 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-3">Sign In Required</h1>
-          <p className="text-white/60 mb-6">
-            You need to sign in to accept this invitation.
-          </p>
-          <Link to={`/auth?redirect=${encodeURIComponent(`/consent/${token}`)}`} className="btn-primary inline-flex items-center gap-2">
-            Sign In
           </Link>
         </div>
       </div>
@@ -185,11 +217,18 @@ export default function ConsentAcceptPage() {
 
   const handleAccept = async () => {
     if (!token || !choice) return;
-    setLoading(true);
 
+    if (!state.user) {
+      savePendingConsent({ token, choice, realName: realName.trim() });
+      navigate(`/auth?redirect=${encodeURIComponent(`/consent/${token}`)}`);
+      return;
+    }
+
+    setLoading(true);
     const res = await acceptInvitation(token, choice, realName.trim() || undefined);
     setResult(res);
     setLoading(false);
+    clearPendingConsent();
   };
 
   return (
@@ -284,14 +323,14 @@ export default function ConsentAcceptPage() {
               },
             ].map((option) => (
               <label
-  key={option.value}
-  onClick={() => setChoice(option.value)}
-  className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all duration-200 border ${
-    choice === option.value
-      ? 'glass-panel border-blue-400/40'
-      : 'glass-panel-light border-transparent hover:border-white/20'
-  }`}
->
+                key={option.value}
+                onClick={() => setChoice(option.value)}
+                className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all duration-200 border ${
+                  choice === option.value
+                    ? 'glass-panel border-blue-400/40'
+                    : 'glass-panel-light border-transparent hover:border-white/20'
+                }`}
+              >
                 <div
                   className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
                     choice === option.value ? 'border-blue-400 bg-gradient-to-br from-blue-500 to-violet-500' : 'border-white/30'
