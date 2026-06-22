@@ -77,11 +77,7 @@ function AppRoutes() {
       />
       <Route
         path="/consent/:token"
-        element={
-          <ProtectedRoute>
-            <ConsentAcceptPage />
-          </ProtectedRoute>
-        }
+        element={<ConsentAcceptPage />}
       />
       <Route
         path="/settings"
