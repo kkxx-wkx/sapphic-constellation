@@ -39,9 +39,6 @@ if (state.loading) {
   return null;
 }
 
-  if (isLoading) {
-    return null;
-  }
 
   return (
     <Routes>
