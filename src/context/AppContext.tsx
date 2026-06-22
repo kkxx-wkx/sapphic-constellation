@@ -313,7 +313,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const getInvitationByToken = useCallback(async (token: string): Promise<Invitation | null> => {
-    const { data } = await supabase.from('invitations').select('*').eq('token', token).maybeSingle();
+    const { data, error } = await supabase
+      .rpc('get_invitation_by_token_public', { p_token: token })
+      .maybeSingle();
+
+    if (error) {
+      console.error('Invitation lookup failed:', error);
+      return null;
+    }
+
     return data ? formatInvitation(data) : null;
   }, []);
 
